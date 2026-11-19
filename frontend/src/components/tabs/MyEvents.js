@@ -1,81 +1,39 @@
 import React from "react";
-
-// We'll use ethers to interact with the Ethereum network and our contract
-import { ethers } from "ethers";
-
-// We import the contract's artifacts and address here, as we are going to be
-// using them with ethers
-import EventArtifact from "../../contracts/Event.json";
-import EventCreatorArtifact from "../../contracts/EventCreator.json";
-import contractAddress from "../../contracts/contract-address.json";
-
-// All the logic of this dapp is contained in the Dapp component.
-// These other components are just presentational ones: they don't have any
-// logic. They just render HTML.
-import { NoWalletDetected } from "../error_handling/NoWalletDetected";
-import { ConnectWallet } from "../error_handling/ConnectWallet";
-import { Loading } from "../error_handling/Loading";
-import { TransactionErrorMessage } from "../error_handling/TransactionErrorMessage";
-import { WaitingForTransactionMessage } from "../error_handling/WaitingForTransactionMessage";
-
 import {
   Heading,
-  Flex,
-  Center,
-  Wrap,
-  WrapItem,
   Button,
   Text,
-  Form,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  FormHelperText,
-  IconButton,
-  Icon,
   Input,
-  InputGroup,
   SimpleGrid,
   Box,
-  VStack,
   Stack,
   Radio,
   RadioGroup,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel
+  TabPanel,
 } from "@chakra-ui/react";
 
-// This is the default id used by the Hardhat Network
-const HARDHAT_NETWORK_ID = '31337';
-
-// This is an error code that indicates that the user canceled a transaction
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
 
-// This component is in charge of doing these things:
-//   1. It connects to the user's wallet
-//   2. Initializes ethers and the Token contract
-//   3. Polls the user balance to keep it updated.
-//   4. Transfers tokens by sending transactions
-//   5. Renders the whole application
-//
-// Note that (3) and (4) are specific of this sample application, but they show
-// you how to keep your Dapp and contract's state in sync,  and how to send a
-// transaction.
-export class MyEvents extends React.Component {  
-  async setEventStage(index) {
-    console.log("*** Inside set event stage")
+export class MyEvents extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      selectedStages: {},
+      staffInputs: {},
+    };
+  }
+
+  async runContractTx(txPromise) {
     try {
-      this._dismissTransactionError();
-      const tx = await this.props.state.events[index].contract.setStage(parseInt(this.props.state.eventStage));
+      this.props.dismissTransactionError();
+      const tx = await txPromise();
       this.props.setState({ txBeingSent: tx.hash });
       const receipt = await tx.wait();
 
       if (receipt.status === 0) {
         throw new Error("Transaction failed");
       }
+
       await this.props.updateBalance();
       await this.props.getEventsData();
     } catch (error) {
@@ -88,79 +46,135 @@ export class MyEvents extends React.Component {
     }
   }
 
-  // If everything is loaded, we render the application.
   render() {
-  return (
-    <TabPanel mt="15px" mb="15px" align="center">
-      <Heading mb="25px">My Events</Heading>
-      <SimpleGrid columns={4} spacing={10} mt="30px">
-        { 
-          this.props.state.events.map((event, index) => (
-            <Box 
-              key={index} 
-              borderRadius="5px"
-              border="1px solid"
-              borderColor="gray.200"
-              p="20px" 
-              width="20rem"
-            >
-              <Text isTruncated fontWeight="bold" fontSize="xl" mb="7px"> Event {index + 1}</Text>
-              <Text>Event: {event.name}</Text>
-              <Text>Balance: {event.ownerBalance}</Text>
-              <Text>Number of Tickets Left: {event.numTicketsLeft}</Text>
+    const currentUser = (this.props.state.selectedAddress || "").toLowerCase();
+    const myEvents = (this.props.state.events || []).filter(
+      (eventItem) => eventItem.owner.toLowerCase() === currentUser
+    );
+
+    return (
+      <TabPanel mt="15px" mb="15px" align="center">
+        <Heading mb="25px">My Events</Heading>
+        <SimpleGrid columns={3} spacing={8} mt="30px">
+          {myEvents.map((eventItem) => {
+            const addr = eventItem.contractAddress;
+            const currentStage =
+              this.state.selectedStages[addr] !== undefined
+                ? this.state.selectedStages[addr]
+                : String(eventItem.stage);
+
+            return (
               <Box
+                key={addr}
                 borderRadius="5px"
                 border="1px solid"
-                borderColor="gray.100"
-                padding="10px"
-                mt="10px"
+                borderColor="gray.200"
+                p="20px"
+                width="20rem"
               >
-                <RadioGroup 
-                  mb="10px"
-                  onChange={(e) => {
-                    e.preventDefault()
-                    this.props.setState({eventStage: e});
-                  }} 
-                  value={event.stage.toString() == this.props.state.eventStage ? this.props.state.eventStage : event.stage.toString()}
-                  defaultValue={event.stage.toString()}
+                <Text isTruncated fontWeight="bold" fontSize="xl" mb="7px">
+                  {eventItem.name}
+                </Text>
+                <Text>Revenue: {eventItem.revenueEth} ETH</Text>
+                <Text>Tickets Left: {eventItem.numTicketsLeft}</Text>
+
+                <Box
+                  borderRadius="5px"
+                  border="1px solid"
+                  borderColor="gray.100"
+                  padding="10px"
+                  mt="10px"
                 >
-                  <Stack spacing={4} direction="column">
-                    <Radio value="0" mb="0">Prep</Radio>
-                    <Radio value="1">Active</Radio>
-                    <Radio value="2">Checkin Open</Radio>
-                    <Radio value="3">Cancelled</Radio>
-                    <Radio value="4">Closed</Radio>
-                  </Stack>
-                </RadioGroup>
-                <Button 
-                  type='submit' 
+                  <RadioGroup
+                    mb="10px"
+                    value={currentStage}
+                    onChange={(val) =>
+                      this.setState((prev) => ({
+                        selectedStages: { ...prev.selectedStages, [addr]: val },
+                      }))
+                    }
+                  >
+                    <Stack spacing={2} direction="column" align="start">
+                      <Radio value="0">Prep</Radio>
+                      <Radio value="1">Active</Radio>
+                      <Radio value="2">Checkin Open</Radio>
+                      <Radio value="3">Closed</Radio>
+                    </Stack>
+                  </RadioGroup>
+                  <Button
+                    type="button"
+                    color={this.props.state.darkGreen}
+                    backgroundColor={this.props.state.lightGreen}
+                    size="md"
+                    mt="10px"
+                    width="210px"
+                    onClick={() =>
+                      this.runContractTx(() =>
+                        eventItem.contract.setStage(parseInt(currentStage, 10))
+                      )
+                    }
+                  >
+                    Set Event Stage
+                  </Button>
+                </Box>
+
+                <Box
+                  borderRadius="5px"
+                  border="1px solid"
+                  borderColor="gray.100"
+                  padding="10px"
+                  mt="10px"
+                >
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const staffAddr = (this.state.staffInputs[addr] || "").trim();
+                      if (!staffAddr) return;
+                      this.runContractTx(() => eventItem.contract.setStaff(staffAddr, true));
+                    }}
+                  >
+                    <Input
+                      isRequired
+                      type="text"
+                      size="sm"
+                      placeholder="Staff wallet address (0x...)"
+                      value={this.state.staffInputs[addr] || ""}
+                      onChange={(e) =>
+                        this.setState((prev) => ({
+                          staffInputs: { ...prev.staffInputs, [addr]: e.target.value },
+                        }))
+                      }
+                      mb="8px"
+                    />
+                    <Button
+                      type="submit"
+                      color={this.props.state.darkGreen}
+                      backgroundColor={this.props.state.lightGreen}
+                      size="md"
+                      width="210px"
+                    >
+                      Add Check-in Staff
+                    </Button>
+                  </form>
+                </Box>
+
+                <Button
+                  type="button"
                   color={this.props.state.darkGreen}
                   backgroundColor={this.props.state.lightGreen}
-                  size="lg"
+                  size="md"
                   mt="10px"
                   width="210px"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    this.setEventStage(index)
-                  }}
+                  isDisabled={eventItem.revenue.isZero()}
+                  onClick={() => this.runContractTx(() => eventItem.contract.withdrawRevenue())}
                 >
-                  Set Event Stage
+                  Withdraw Revenue
                 </Button>
               </Box>
-              <Button 
-                  type='submit' 
-                  color={this.props.state.darkGreen}
-                  backgroundColor={this.props.state.lightGreen}
-                  size="lg"
-                  mt="10px"
-                  width="210px"
-                >
-                  Owner Withdraw
-                </Button>
-            </Box>
-          ))
-        }
-      </SimpleGrid>
-  </TabPanel>
-  )}
+            );
+          })}
+        </SimpleGrid>
+      </TabPanel>
+    );
+  }
 }

@@ -57,9 +57,10 @@ Mọi luồng UI và Smart Contract phải đảm bảo chạy thông suốt đ�
   * Hàm `useTicket(uint256 ticketID) external`:
     * Yêu cầu quyền soát vé (`msg.sender == owner || staff[msg.sender]`) và `stage == Stages.CheckinOpen` (hoặc `Active`/`CheckinOpen` tùy cấu hình stage khi demo).
     * Yêu cầu `_exists(ticketID)` và `!isUsed[ticketID]`.
-    * Gán `isUsed[ticketID] = true;` và `tickets[ticketID].status = TicketStatus.Used;`.
+    * Gán `isUsed[ticketID] = true;` (không dùng `struct Ticket` nữa).
     * **Không** `_burn(ticketID)`.
-    * Emit `TicketUsed(address(this), ticketID, name())`.
+    * Emit `TicketUsed(address(this), ticketID, ownerOf(ticketID), block.timestamp)`.
+  * **Quy ước đơn vị tiền (ETH ↔ wei):** Contract lưu `price` theo `wei` (`uint256`). Frontend nhập giá theo ETH và convert bằng `ethers.utils.parseEther(...)`, giữ `price` dạng `BigNumber` (KHÔNG gọi `.toNumber()` để tránh overflow) và hiển thị bằng `ethers.utils.formatEther(...)`.
 * **Quy trình cập nhật ABI:** Sau khi sửa `Event.sol`, bắt buộc chạy:
   ```bash
   npx hardhat compile

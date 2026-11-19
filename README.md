@@ -1,74 +1,38 @@
-# TicketChain
+# NFTix — Hệ thống Vé điện tử NFT (Hybrid On-chain / Off-chain)
 
-TicketChain is an NFT event ticketing system that allows event organizers to create events and customers to purchase tickets, all on the Ethereum blockchain. This was originally built for UNSW's Software Architecture for Blockchain-based Applications, but it has since been expanded. The hosted web application on the Ethereum Sepolia Test Network can be viewed [here](https://nft-event-ticketing-0c6fb6610440.herokuapp.com/).
+Hệ thống bán vé và soát vé sự kiện bằng NFT chuẩn **ERC-721** chống làm giả và chống dùng lại vé, xây dựng trên nền tảng **Hardhat + Solidity (`0.8.17`)** và **React + Chakra UI + Ethers.js v5**.
 
-## Installation and Dependencies
+## Tài liệu chuẩn của nhóm
+- [roadmap.md](./roadmap.md) — Đặc tả kiến trúc Hybrid, 5 bước Behavior chuẩn và quy ước Payload QR.
+- [design.md](./design.md) — Đặc tả giao diện *Minimalist Digital Ticket Pass* (Light Mode, Ticket Stub UI, Micro-animations).
 
-### Quick start
+## Cấu trúc chính
+- `contracts/Event.sol`: Factory `EventCreator` và contract `Event` (ERC-721) tối giản (`buyTicket`, `useTicket` với `isUsed`, `setStaff`, `setStage`, `withdrawRevenue`).
+- `scripts/deploy.js`: Deploy `EventCreator` và tự động xuất ABI + địa chỉ contract sang `frontend/src/contracts/`.
+- `test/Event.js`: Bộ Unit Test Hardhat cho toàn bộ luồng Factory, Mint vé, Soát vé và Rút doanh thu.
+- `frontend/`: Giao diện Web3 React kết nối MetaMask.
 
-The first things you need to do are cloning this repository and installing its
-dependencies:
-
-```sh
-git clone https://github.com/mgysel/nft-ticketing.git
-cd hardhat-boilerplate
-npm install
-```
-
-Once installed, let's run Hardhat's testing network:
-
-```sh
-npx hardhat node
-```
-
-Then, on a new terminal, go to the repository's root folder and run this to
-deploy your contract:
-
-```sh
-npx hardhat run scripts/deploy.js --network localhost
-```
-
-Finally, we can run the frontend with:
-
-```sh
-cd frontend
-npm install
-npm start
-```
-
-Open [http://localhost:3000/](http://localhost:3000/) to see your Dapp. You will
-need to have [Metamask](https://metamask.io) installed and listening to
-`localhost 8545`.
-
-### User Guide
-
-You can find detailed instructions on using this repository and many tips in [its documentation](https://hardhat.org/tutorial).
-
-- [Writing and compiling contracts](https://hardhat.org/tutorial/writing-and-compiling-contracts/)
-- [Setting up the environment](https://hardhat.org/tutorial/setting-up-the-environment/)
-- [Testing Contracts](https://hardhat.org/tutorial/testing-contracts/)
-- [Setting up your wallet](https://hardhat.org/tutorial/boilerplate-project#how-to-use-it)
-- [Hardhat's full documentation](https://hardhat.org/docs/)
-
-For a complete introduction to Hardhat, refer to [this guide](https://hardhat.org/getting-started/#overview).
-
-### What's Included?
-
-This repository uses our recommended hardhat setup, by using our [`@nomicfoundation/hardhat-toolbox`](https://hardhat.org/hardhat-runner/plugins/nomicfoundation-hardhat-toolbox). When you use this plugin, you'll be able to:
-
-- Deploy and interact with your contracts using [ethers.js](https://docs.ethers.io/v5/) and the [`hardhat-ethers`](https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-ethers) plugin.
-- Test your contracts with [Mocha](https://mochajs.org/), [Chai](https://chaijs.com/) and our own [Hardhat Chai Matchers](https://hardhat.org/hardhat-chai-matchers) plugin.
-- Interact with Hardhat Network with our [Hardhat Network Helpers](https://hardhat.org/hardhat-network-helpers).
-- Verify the source code of your contracts with the [hardhat-etherscan](https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-etherscan) plugin.
-- Get metrics on the gas used by your contracts with the [hardhat-gas-reporter](https://github.com/cgewecke/hardhat-gas-reporter) plugin.
-- Measure your tests coverage with [solidity-coverage](https://github.com/sc-forks/solidity-coverage).
-
-This project also includes [a sample frontend/Dapp](./frontend), which uses [Create React App](https://github.com/facebook/create-react-app).
-
-## Troubleshooting
-
-- `Invalid nonce` errors: if you are seeing this error on the `npx hardhat node`
-  console, try resetting your Metamask account. This will reset the account's
-  transaction history and also the nonce. Open Metamask, click on your account
-  followed by `Settings > Advanced > Clear activity tab data`.
-# NFT_Ticketing
+## Hướng dẫn chạy Local
+1. Cài đặt dependencies:
+   ```sh
+   npm install
+   cd frontend && npm install
+   ```
+2. Chạy Unit Test Smart Contract:
+   ```sh
+   npx hardhat test
+   ```
+3. Khởi chạy node Blockchain local (Terminal 1):
+   ```sh
+   npx hardhat node
+   ```
+4. Deploy contract lên localhost (Terminal 2):
+   ```sh
+   npx hardhat run scripts/deploy.js --network localhost
+   ```
+5. Chạy Frontend (Terminal 3):
+   ```sh
+   cd frontend
+   npm start
+   ```
+6. Cấu hình MetaMask kết nối mạng **Localhost 8545** (`Chain ID: 31337`). Nếu gặp lỗi `Nonce too high` sau khi restart `npx hardhat node`, vào **MetaMask → Settings → Advanced → Clear activity tab data**.
