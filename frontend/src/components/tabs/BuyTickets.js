@@ -6,12 +6,14 @@ import {
   Flex,
   Heading,
   HStack,
+  Image,
   SimpleGrid,
   Spinner,
   TabPanel,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { getEventCover } from "../../utils/eventCover";
 
 export function BuyTickets({
   events,
@@ -97,8 +99,9 @@ export function BuyTickets({
         </Box>
       ) : (
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-          {activeEvents.map((eventItem) => {
+          {activeEvents.map((eventItem, index) => {
             const soldOut = eventItem.numTicketsLeft === 0;
+            const coverSrc = getEventCover(eventItem.contractAddress, index);
 
             return (
               <Box
@@ -117,55 +120,77 @@ export function BuyTickets({
                   boxShadow: "0 14px 30px rgba(131, 195, 255, 0.12)",
                 }}
               >
-                {/* Minimalist Dark NFT Artwork Header */}
+                {/* Art Cover Banner with Zoom & Dark Gradient Overlay */}
                 <Box
-                  h="132px"
-                  p={5}
+                  position="relative"
+                  h="160px"
+                  overflow="hidden"
                   bg="#141414"
                   borderBottom="1px solid"
                   borderColor="#202020"
-                  display="flex"
-                  flexDirection="column"
-                  justifyContent="space-between"
-                  bgImage="radial-gradient(circle at top right, rgba(131, 195, 255, 0.14), transparent 60%)"
                 >
-                  <HStack justify="space-between">
-                    <Badge
-                      px={2.5}
-                      py={1}
-                      borderRadius="9999px"
-                      bg="#0c0c0c"
-                      border="1px solid"
-                      borderColor="#202020"
-                      color="#acacac"
+                  <Image
+                    src={coverSrc}
+                    alt={`${eventItem.name} cover`}
+                    w="100%"
+                    h="100%"
+                    objectFit="cover"
+                    transition="transform 300ms ease"
+                    _groupHover={{ transform: "scale(1.06)" }}
+                  />
+                  <Box
+                    position="absolute"
+                    inset={0}
+                    bgGradient="linear(180deg, rgba(12,12,12,0.35) 0%, rgba(12,12,12,0.95) 100%)"
+                  />
+                  <Flex
+                    position="relative"
+                    zIndex={1}
+                    h="100%"
+                    p={5}
+                    direction="column"
+                    justify="space-between"
+                  >
+                    <HStack justify="space-between">
+                      <Badge
+                        px={2.5}
+                        py={1}
+                        borderRadius="9999px"
+                        bg="rgba(12, 12, 12, 0.78)"
+                        backdropFilter="blur(6px)"
+                        border="1px solid"
+                        borderColor="#202020"
+                        color="#ffffff"
+                        fontFamily="mono"
+                        fontSize="xs"
+                      >
+                        {eventItem.symbol}
+                      </Badge>
+                      <Badge
+                        px={2.5}
+                        py={1}
+                        borderRadius="9999px"
+                        bg="rgba(16, 185, 129, 0.2)"
+                        backdropFilter="blur(6px)"
+                        border="1px solid"
+                        borderColor="#10B981"
+                        color="#10B981"
+                        fontSize="xs"
+                        textTransform="none"
+                      >
+                        {soldOut ? "Sold Out" : "Active"}
+                      </Badge>
+                    </HStack>
+
+                    <Text
                       fontFamily="mono"
                       fontSize="xs"
+                      color="#acacac"
+                      isTruncated
                     >
-                      {eventItem.symbol}
-                    </Badge>
-                    <Badge
-                      px={2.5}
-                      py={1}
-                      borderRadius="9999px"
-                      bg="rgba(16, 185, 129, 0.15)"
-                      border="1px solid"
-                      borderColor="#10B981"
-                      color="#10B981"
-                      fontSize="xs"
-                      textTransform="none"
-                    >
-                      {soldOut ? "Sold Out" : "Active"}
-                    </Badge>
-                  </HStack>
-
-                  <Text
-                    fontFamily="mono"
-                    fontSize="xs"
-                    color="#acacac"
-                    isTruncated
-                  >
-                    {eventItem.contractAddress}
-                  </Text>
+                      {eventItem.contractAddress}
+                    </Text>
+                  </Flex>
                 </Box>
 
                 {/* Card Body */}

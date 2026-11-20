@@ -6,12 +6,14 @@ import {
   Flex,
   Heading,
   HStack,
+  Image,
   SimpleGrid,
   TabPanel,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { TicketQrModal } from "../TicketQrModal";
+import { getEventCover } from "../../utils/eventCover";
 
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
 
@@ -229,134 +231,182 @@ export function MyTickets({
         </Box>
       ) : (
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-          {ownedEvents.map((eventItem) =>
-            eventItem.myTickets.map((ticket) => (
-              <Box
-                key={`${eventItem.contractAddress}-${ticket.ticketID}`}
-                position="relative"
-                bg="#0c0c0c"
-                border="1px solid"
-                borderColor="#202020"
-                borderRadius="16px"
-                overflow="hidden"
-                transition="all 250ms cubic-bezier(0.16, 1, 0.3, 1)"
-                _hover={{
-                  transform: "translateY(-4px)",
-                  borderColor: ticket.isUsed ? "#202020" : "#83c3ff",
-                }}
-              >
-                {/* Ticket Top Info */}
-                <VStack align="stretch" spacing={3} p={5}>
-                  <HStack justify="space-between" align="start">
-                    <Box minW={0}>
+          {ownedEvents.map((eventItem, eventIdx) =>
+            eventItem.myTickets.map((ticket) => {
+              const coverSrc = getEventCover(eventItem.contractAddress, eventIdx);
+
+              return (
+                <Box
+                  key={`${eventItem.contractAddress}-${ticket.ticketID}`}
+                  role="group"
+                  position="relative"
+                  bg="#0c0c0c"
+                  border="1px solid"
+                  borderColor="#202020"
+                  borderRadius="16px"
+                  overflow="hidden"
+                  transition="all 250ms cubic-bezier(0.16, 1, 0.3, 1)"
+                  _hover={{
+                    transform: "translateY(-4px)",
+                    borderColor: ticket.isUsed ? "#202020" : "#83c3ff",
+                    boxShadow: ticket.isUsed
+                      ? "none"
+                      : "0 14px 30px rgba(131, 195, 255, 0.12)",
+                  }}
+                >
+                  {/* Synced Art Cover Banner */}
+                  <Box
+                    position="relative"
+                    h="140px"
+                    overflow="hidden"
+                    bg="#141414"
+                    borderBottom="1px solid"
+                    borderColor="#202020"
+                  >
+                    <Image
+                      src={coverSrc}
+                      alt={`${eventItem.name} cover`}
+                      w="100%"
+                      h="100%"
+                      objectFit="cover"
+                      opacity={ticket.isUsed ? 0.45 : 1}
+                      transition="transform 300ms ease"
+                      _groupHover={{ transform: "scale(1.06)" }}
+                    />
+                    <Box
+                      position="absolute"
+                      inset={0}
+                      bgGradient="linear(180deg, rgba(12,12,12,0.35) 0%, rgba(12,12,12,0.95) 100%)"
+                    />
+                    <Flex
+                      position="relative"
+                      zIndex={1}
+                      h="100%"
+                      p={5}
+                      direction="column"
+                      justify="space-between"
+                    >
+                      <HStack justify="space-between" align="start">
+                        <Badge
+                          px={2.5}
+                          py={1}
+                          borderRadius="9999px"
+                          bg="rgba(12, 12, 12, 0.78)"
+                          backdropFilter="blur(6px)"
+                          border="1px solid"
+                          borderColor="#202020"
+                          color="#ffffff"
+                          fontFamily="mono"
+                          fontSize="xs"
+                        >
+                          {eventItem.symbol}
+                        </Badge>
+                        <Badge
+                          px={2.5}
+                          py={1}
+                          borderRadius="9999px"
+                          bg={
+                            ticket.isUsed
+                              ? "rgba(244, 63, 94, 0.2)"
+                              : "rgba(16, 185, 129, 0.2)"
+                          }
+                          backdropFilter="blur(6px)"
+                          border="1px solid"
+                          borderColor={ticket.isUsed ? "#F43F5E" : "#10B981"}
+                          color={ticket.isUsed ? "#F43F5E" : "#10B981"}
+                          fontSize="xs"
+                          textTransform="none"
+                          flexShrink={0}
+                        >
+                          {ticket.isUsed ? "Used" : "Valid"}
+                        </Badge>
+                      </HStack>
+
                       <Text
-                        fontSize="lg"
+                        fontFamily="mono"
                         fontWeight="700"
-                        color="#ffffff"
-                        isTruncated
+                        color="#83c3ff"
+                        fontSize="sm"
                       >
-                        {eventItem.name}
+                        Token #{ticket.ticketID}
                       </Text>
-                      <Text fontSize="xs" fontFamily="mono" color="#acacac">
-                        {eventItem.symbol}
-                      </Text>
-                    </Box>
-                    <Badge
-                      px={2.5}
-                      py={1}
-                      borderRadius="9999px"
-                      bg={
-                        ticket.isUsed
-                          ? "rgba(244, 63, 94, 0.15)"
-                          : "rgba(16, 185, 129, 0.15)"
-                      }
-                      border="1px solid"
-                      borderColor={ticket.isUsed ? "#F43F5E" : "#10B981"}
-                      color={ticket.isUsed ? "#F43F5E" : "#10B981"}
-                      fontSize="xs"
-                      textTransform="none"
-                      flexShrink={0}
-                    >
-                      {ticket.isUsed ? "Used" : "Valid"}
-                    </Badge>
-                  </HStack>
+                    </Flex>
+                  </Box>
 
-                  <HStack justify="space-between" pt={1}>
-                    <Text fontSize="xs" color="#acacac">
-                      NFT Pass ID
-                    </Text>
+                  {/* Ticket Info */}
+                  <VStack align="stretch" spacing={2.5} p={5}>
                     <Text
-                      fontFamily="mono"
+                      fontSize="lg"
                       fontWeight="700"
-                      color="#83c3ff"
-                      fontSize="sm"
+                      color="#ffffff"
+                      isTruncated
                     >
-                      Token #{ticket.ticketID}
+                      {eventItem.name}
                     </Text>
-                  </HStack>
 
-                  <Text
-                    fontSize="xs"
-                    fontFamily="mono"
-                    color="#acacac"
-                    isTruncated
-                  >
-                    Contract: {eventItem.contractAddress}
-                  </Text>
-                </VStack>
+                    <Text
+                      fontSize="xs"
+                      fontFamily="mono"
+                      color="#acacac"
+                      isTruncated
+                    >
+                      Contract: {eventItem.contractAddress}
+                    </Text>
+                  </VStack>
 
-                {/* Ticket Stub Dashed Divider + Side Notches */}
-                <Box position="relative" borderTop="1px dashed" borderColor="#202020">
-                  <Box
-                    position="absolute"
-                    top="-9px"
-                    left="-9px"
-                    w="18px"
-                    h="18px"
-                    borderRadius="9999px"
-                    bg="#000000"
-                    border="1px solid"
-                    borderColor="#202020"
-                  />
-                  <Box
-                    position="absolute"
-                    top="-9px"
-                    right="-9px"
-                    w="18px"
-                    h="18px"
-                    borderRadius="9999px"
-                    bg="#000000"
-                    border="1px solid"
-                    borderColor="#202020"
-                  />
+                  {/* Ticket Stub Dashed Divider + Side Notches */}
+                  <Box position="relative" borderTop="1px dashed" borderColor="#202020">
+                    <Box
+                      position="absolute"
+                      top="-9px"
+                      left="-9px"
+                      w="18px"
+                      h="18px"
+                      borderRadius="9999px"
+                      bg="#000000"
+                      border="1px solid"
+                      borderColor="#202020"
+                    />
+                    <Box
+                      position="absolute"
+                      top="-9px"
+                      right="-9px"
+                      w="18px"
+                      h="18px"
+                      borderRadius="9999px"
+                      bg="#000000"
+                      border="1px solid"
+                      borderColor="#202020"
+                    />
+                  </Box>
+
+                  {/* Ticket Bottom Action */}
+                  <Box p={5} bg="#0c0c0c">
+                    <Button
+                      w="full"
+                      h="44px"
+                      bg={ticket.isUsed ? "#141414" : "#83c3ff"}
+                      color={ticket.isUsed ? "#acacac" : "#000000"}
+                      fontWeight="700"
+                      borderRadius="12px"
+                      border={ticket.isUsed ? "1px solid #202020" : "none"}
+                      isDisabled={ticket.isUsed || !!txBeingSent}
+                      _hover={
+                        ticket.isUsed ? undefined : { bg: "#a2d3ff" }
+                      }
+                      onClick={() =>
+                        setSelection({
+                          address: eventItem.contractAddress,
+                          ticketID: ticket.ticketID,
+                        })
+                      }
+                    >
+                      {ticket.isUsed ? "Đã sử dụng" : "Lấy mã QR"}
+                    </Button>
+                  </Box>
                 </Box>
-
-                {/* Ticket Bottom Action */}
-                <Box p={5} bg="#0c0c0c">
-                  <Button
-                    w="full"
-                    h="44px"
-                    bg={ticket.isUsed ? "#141414" : "#83c3ff"}
-                    color={ticket.isUsed ? "#acacac" : "#000000"}
-                    fontWeight="700"
-                    borderRadius="12px"
-                    border={ticket.isUsed ? "1px solid #202020" : "none"}
-                    isDisabled={ticket.isUsed || !!txBeingSent}
-                    _hover={
-                      ticket.isUsed ? undefined : { bg: "#a2d3ff" }
-                    }
-                    onClick={() =>
-                      setSelection({
-                        address: eventItem.contractAddress,
-                        ticketID: ticket.ticketID,
-                      })
-                    }
-                  >
-                    {ticket.isUsed ? "Đã sử dụng" : "Lấy mã QR"}
-                  </Button>
-                </Box>
-              </Box>
-            ))
+              );
+            })
           )}
         </SimpleGrid>
       )}
