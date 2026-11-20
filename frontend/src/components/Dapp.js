@@ -48,6 +48,7 @@ export class Dapp extends React.Component {
       lightGreen: "#C6F6DF",
       events: [],
       usedTicketID: "",
+      activeTab: 0,
     };
 
     this.state = this.initialState;
@@ -109,6 +110,8 @@ export class Dapp extends React.Component {
             </Box>
 
             <Tabs
+              index={this.state.activeTab}
+              onChange={(activeTab) => this.setState({ activeTab })}
               mt="15px"
               p="20px"
               variant="soft-rounded"
@@ -142,6 +145,7 @@ export class Dapp extends React.Component {
                   getEventsData={this._getEventsData}
                 />
                 <MyTickets
+                  isActive={this.state.activeTab === 2}
                   state={this.state}
                   setState={this.setState}
                   dismissTransactionError={this._dismissTransactionError}
@@ -158,6 +162,7 @@ export class Dapp extends React.Component {
                   getEventsData={this._getEventsData}
                 />
                 <EntryGate
+                  isActive={this.state.activeTab === 4}
                   state={this.state}
                   setState={this.setState}
                   dismissTransactionError={this._dismissTransactionError}
@@ -193,16 +198,19 @@ export class Dapp extends React.Component {
 
       this._initialize(newAddress);
     });
+    // Discard signed QR state and contracts when the wallet changes network.
+    window.ethereum.on("chainChanged", () => window.location.reload());
   }
 
   _initialize(userAddress) {
     this.setState({
       selectedAddress: userAddress,
+      events: [],
+      balance: undefined,
+    }, () => {
+      this._initializeEthers();
+      this._startPollingData();
     });
-
-    this._initializeEthers();
-    this._startPollingData();
-    this._getEventsData();
   }
 
   _initializeEthers() {
@@ -278,9 +286,11 @@ export class Dapp extends React.Component {
       return;
     }
 
-    const eventAddresses = await this._eventCreator.getEvents();
+    const selectedAddress = this.state.selectedAddress;
+    const eventCreator = this._eventCreator;
+    const eventAddresses = await eventCreator.getEvents();
     const signer = this._provider.getSigner(0);
-    const currentUser = this.state.selectedAddress.toLowerCase();
+    const currentUser = selectedAddress.toLowerCase();
     const eventsData = [];
 
     for (let i = 0; i < eventAddresses.length; i++) {
@@ -307,7 +317,7 @@ export class Dapp extends React.Component {
         thisEvent.totalMinted(),
         thisEvent.price(),
         thisEvent.stage(),
-        thisEvent.balanceOf(this.state.selectedAddress),
+        thisEvent.balanceOf(selectedAddress),
         this._provider.getBalance(eventAddr),
       ]);
 
@@ -348,6 +358,8 @@ export class Dapp extends React.Component {
       });
     }
 
-    this.setState({ events: eventsData });
+    if (this.state.selectedAddress === selectedAddress && this._eventCreator === eventCreator) {
+      this.setState({ events: eventsData });
+    }
   }
 }

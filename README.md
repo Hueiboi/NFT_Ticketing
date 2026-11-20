@@ -36,3 +36,16 @@ Hệ thống bán vé và soát vé sự kiện bằng NFT chuẩn **ERC-721** c
    npm start
    ```
 6. Cấu hình MetaMask kết nối mạng **Localhost 8545** (`Chain ID: 31337`). Nếu gặp lỗi `Nonce too high` sau khi restart `npx hardhat node`, vào **MetaMask → Settings → Advanced → Clear activity tab data**.
+
+## Dynamic QR
+
+1. Ví người mua mở **My Tickets → Lấy mã QR** và xác nhận chữ ký trên MetaMask (không tốn gas).
+2. QR chứa `{ contractAddress, tokenId, timestamp, signature }`, ký đúng chuỗi `${contractAddress}:${tokenId}:${timestamp}`. Hiệu lực 30 giây tính từ lúc tạo yêu cầu ký; nếu ký quá lâu, hãy tạo lại mã. Có đếm ngược, thanh thời gian, **Làm mới mã QR** và **Copy chuỗi QR**.
+3. Chuyển sự kiện sang **CheckinOpen**. Ví ban tổ chức hoặc nhân viên được cấp quyền mở **Entry Gate**, chọn sự kiện rồi bật camera hoặc dán chuỗi QR. Camera dùng HTTPS hoặc localhost và cần được cấp quyền trong trình duyệt.
+4. Gate kiểm tra thời hạn, chữ ký, chủ sở hữu NFT hiện tại, trạng thái chưa dùng và quyền nhân viên trước khi yêu cầu giao dịch `useTicket`. Sau khi giao dịch được xác nhận, hiển thị thông báo thành công và transaction hash. NFT vẫn ở trong ví.
+
+Khi demo trên cùng máy, có thể sao chép QR rồi chuyển sang ví nhân viên và dán trong 30 giây. Làm mới QR là thao tác thủ công vì mỗi mã cần một chữ ký mới. Đồng hồ hai thiết bị cần đồng bộ. Mã cũ còn hiệu lực đến hết thời hạn của chính nó; sau khi check-in, trạng thái `isUsed` chặn dùng lại.
+
+Theo kiến trúc Hybrid hiện tại, chữ ký và thời hạn QR được kiểm tra ở frontend tại thời điểm soát vé, còn smart contract kiểm tra quyền nhân viên và khóa vé đã dùng. Thời gian chờ xác nhận MetaMask hoặc mining không kéo dài thời hạn hiển thị QR; contract không tự xác thực payload QR.
+
+Kiểm thử frontend: chạy `npm test -- --watchAll=false --runInBand` trong `frontend/`. Build: `npm run build`.
