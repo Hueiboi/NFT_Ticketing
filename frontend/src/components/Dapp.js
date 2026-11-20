@@ -1,365 +1,689 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ethers } from "ethers";
+import {
+  Badge,
+  Box,
+  Button,
+  Container,
+  Flex,
+  HStack,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Text,
+} from "@chakra-ui/react";
 
 import EventArtifact from "../contracts/Event.json";
 import EventCreatorArtifact from "../contracts/EventCreator.json";
 import contractAddress from "../contracts/contract-address.json";
 
-import { NoWalletDetected } from "./error_handling/NoWalletDetected";
-import { ConnectWallet } from "./error_handling/ConnectWallet";
-import { Loading } from "./error_handling/Loading";
 import { TransactionErrorMessage } from "./error_handling/TransactionErrorMessage";
 import { WaitingForTransactionMessage } from "./error_handling/WaitingForTransactionMessage";
+import { NetworkErrorMessage } from "./error_handling/NetworkErrorMessage";
+import { TxSuccessModal } from "./TxSuccessModal";
 
-import { CreateEvent } from "./tabs/CreateEvent.js";
-import { BuyTickets } from "./tabs/BuyTickets.js";
-import { MyTickets } from "./tabs/MyTickets.js";
-import { MyEvents } from "./tabs/MyEvents.js";
-import { EntryGate } from "./tabs/EntryGate.js";
-
-import {
-  Heading,
-  Flex,
-  Box,
-  VStack,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-} from "@chakra-ui/react";
+import { BuyTickets } from "./tabs/BuyTickets";
+import { MyTickets } from "./tabs/MyTickets";
+import { EntryGate } from "./tabs/EntryGate";
+import { CreateEvent } from "./tabs/CreateEvent";
+import { MyEvents } from "./tabs/MyEvents";
 
 const HARDHAT_NETWORK_ID = "31337";
+const HARDHAT_CHAIN_HEX = "0x7a69";
+const LOCAL_RPC_URL = "http://127.0.0.1:8545";
 
-export class Dapp extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.initialState = {
-      selectedAddress: undefined,
-      balance: undefined,
-      txBeingSent: undefined,
-      transactionError: undefined,
-      networkError: undefined,
-      formEventName: "",
-      formEventSymbol: "",
-      formNumTickets: "",
-      formPrice: "",
-      darkGreen: "#276749",
-      lightGreen: "#C6F6DF",
-      events: [],
-      usedTicketID: "",
-      activeTab: 0,
-    };
-
-    this.state = this.initialState;
-
-    this.setState = this.setState.bind(this);
-    this._dismissTransactionError = this._dismissTransactionError.bind(this);
-    this._updateBalance = this._updateBalance.bind(this);
-    this._getEventsData = this._getEventsData.bind(this);
-    this._getRpcErrorMessage = this._getRpcErrorMessage.bind(this);
+function getRpcErrorMessage(error) {
+  if (error?.code === 4001 || error?.code === "ACTION_REJECTED") {
+    return "Bạn đã từ chối yêu cầu trên MetaMask.";
   }
-
-  render() {
-    if (window.ethereum === undefined) {
-      return <NoWalletDetected />;
-    }
-
-    if (!this.state.selectedAddress) {
-      return (
-        <ConnectWallet
-          connectWallet={() => this._connectWallet()}
-          networkError={this.state.networkError}
-          dismiss={() => this._dismissNetworkError()}
-        />
-      );
-    }
-
-    if (!this.state.balance) {
-      return <Loading />;
-    }
-
-    return (
-      <div className="container p-4">
-        <div>
-          <Flex w="90%" my="20px" ml="5%" mr="5%" direction="column">
-            <nav className="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
-              <Heading ml={20} color="white">
-                NFTix
-              </Heading>
-              <VStack spacing={2} alignItems="right">
-                <Box className="navbar-brand pb-0 mb-0" justify="right">
-                  Account: {this.state.selectedAddress.toString()}
-                </Box>
-                <Box className="navbar-brand pt-0 mt-0" justify="right">
-                  Balance: {this.state.balance.toString()} ETH
-                </Box>
-              </VStack>
-            </nav>
-
-            <Box mt="90px">
-              {this.state.txBeingSent && (
-                <WaitingForTransactionMessage txHash={this.state.txBeingSent} />
-              )}
-              {this.state.transactionError && (
-                <TransactionErrorMessage
-                  message={this._getRpcErrorMessage(this.state.transactionError)}
-                  dismiss={this._dismissTransactionError}
-                />
-              )}
-            </Box>
-
-            <Tabs
-              index={this.state.activeTab}
-              onChange={(activeTab) => this.setState({ activeTab })}
-              mt="15px"
-              p="20px"
-              variant="soft-rounded"
-              colorScheme="green"
-              borderRadius="5px"
-              border="1px solid"
-              borderColor="gray.200"
-            >
-              <TabList>
-                <Tab>Create Events</Tab>
-                <Tab>Purchase Tickets</Tab>
-                <Tab>My Tickets</Tab>
-                <Tab>My Events</Tab>
-                <Tab>Entry Gate</Tab>
-              </TabList>
-              <TabPanels>
-                <CreateEvent
-                  state={this.state}
-                  setState={this.setState}
-                  dismissTransactionError={this._dismissTransactionError}
-                  eventCreator={this._eventCreator}
-                  updateBalance={this._updateBalance}
-                  getEventsData={this._getEventsData}
-                />
-                <BuyTickets
-                  state={this.state}
-                  setState={this.setState}
-                  dismissTransactionError={this._dismissTransactionError}
-                  eventCreator={this._eventCreator}
-                  updateBalance={this._updateBalance}
-                  getEventsData={this._getEventsData}
-                />
-                <MyTickets
-                  isActive={this.state.activeTab === 2}
-                  state={this.state}
-                  setState={this.setState}
-                  dismissTransactionError={this._dismissTransactionError}
-                  eventCreator={this._eventCreator}
-                  updateBalance={this._updateBalance}
-                  getEventsData={this._getEventsData}
-                />
-                <MyEvents
-                  state={this.state}
-                  setState={this.setState}
-                  dismissTransactionError={this._dismissTransactionError}
-                  eventCreator={this._eventCreator}
-                  updateBalance={this._updateBalance}
-                  getEventsData={this._getEventsData}
-                />
-                <EntryGate
-                  isActive={this.state.activeTab === 4}
-                  state={this.state}
-                  setState={this.setState}
-                  dismissTransactionError={this._dismissTransactionError}
-                  eventCreator={this._eventCreator}
-                  updateBalance={this._updateBalance}
-                  getEventsData={this._getEventsData}
-                />
-              </TabPanels>
-            </Tabs>
-          </Flex>
-        </div>
-      </div>
-    );
+  if (error?.reason) {
+    return String(error.reason);
   }
-
-  componentWillUnmount() {
-    this._stopPollingData();
+  if (error?.data?.message) {
+    return String(error.data.message);
   }
+  if (error?.message) {
+    return String(error.message);
+  }
+  return "Đã xảy ra lỗi không xác định.";
+}
 
-  async _connectWallet() {
-    const [selectedAddress] = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
+function shortenAddress(address) {
+  if (!address) return "";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
 
-    await this._checkNetwork();
-    this._initialize(selectedAddress);
+export function Dapp() {
+  const [selectedAddress, setSelectedAddress] = useState(undefined);
+  const [balance, setBalance] = useState(undefined);
+  const [txBeingSent, setTxBeingSent] = useState(undefined);
+  const [transactionError, setTransactionError] = useState(undefined);
+  const [networkError, setNetworkError] = useState(undefined);
+  const [rpcConnected, setRpcConnected] = useState(false);
+  const [rpcError, setRpcError] = useState("");
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+  const [eventCreator, setEventCreator] = useState(null);
+  const [pendingPurchase, setPendingPurchase] = useState(null);
+  const [txSuccess, setTxSuccess] = useState(null);
 
-    window.ethereum.on("accountsChanged", ([newAddress]) => {
-      this._stopPollingData();
-      if (newAddress === undefined) {
-        return this._resetState();
+  const providerRef = useRef(null);
+  const eventCreatorRef = useRef(null);
+  const selectedAddressRef = useRef(undefined);
+  const eventsRequestIdRef = useRef(0);
+
+  const dismissTransactionError = useCallback(() => {
+    setTransactionError(undefined);
+  }, []);
+
+  const dismissNetworkError = useCallback(() => {
+    setNetworkError(undefined);
+  }, []);
+
+  const updateBalance = useCallback(async (addressOverride, providerOverride) => {
+    const addr = addressOverride || selectedAddressRef.current;
+    const provider = providerOverride || providerRef.current;
+    if (!provider || !addr) return;
+
+    const rawBalance = await provider.getBalance(addr);
+    if (selectedAddressRef.current !== addr) return;
+    setBalance(Number(ethers.utils.formatEther(rawBalance)).toFixed(4));
+  }, []);
+
+  const getEventsData = useCallback(
+    async (addressOverride, providerOverride, creatorOverride) => {
+      const addr =
+        addressOverride !== undefined
+          ? addressOverride
+          : selectedAddressRef.current;
+      const provider = providerOverride || providerRef.current;
+      const creator = creatorOverride || eventCreatorRef.current;
+      if (!creator || !provider) {
+        return;
       }
 
-      this._initialize(newAddress);
-    });
-    // Discard signed QR state and contracts when the wallet changes network.
-    window.ethereum.on("chainChanged", () => window.location.reload());
-  }
+      const requestId = ++eventsRequestIdRef.current;
+      try {
+        const eventAddresses = await creator.getEvents();
+        const contractRunner = addr ? provider.getSigner(0) : provider;
+        const currentUser = addr ? addr.toLowerCase() : null;
+        const eventsData = [];
 
-  _initialize(userAddress) {
-    this.setState({
-      selectedAddress: userAddress,
-      events: [],
-      balance: undefined,
-    }, () => {
-      this._initializeEthers();
-      this._startPollingData();
-    });
-  }
+        for (let i = 0; i < eventAddresses.length; i++) {
+          const eventAddr = eventAddresses[i];
+          const thisEvent = new ethers.Contract(
+            eventAddr,
+            EventArtifact.abi,
+            contractRunner
+          );
 
-  _initializeEthers() {
-    this._provider = new ethers.providers.Web3Provider(window.ethereum);
+          const [
+            owner,
+            name,
+            symbol,
+            numTicketsBN,
+            numTicketsLeftBN,
+            totalMintedBN,
+            price,
+            stage,
+            revenue,
+          ] = await Promise.all([
+            thisEvent.owner(),
+            thisEvent.name(),
+            thisEvent.symbol(),
+            thisEvent.numTickets(),
+            thisEvent.numTicketsLeft(),
+            thisEvent.totalMinted(),
+            thisEvent.price(),
+            thisEvent.stage(),
+            provider.getBalance(eventAddr),
+          ]);
 
-    this._eventCreator = new ethers.Contract(
-      contractAddress.EventCreator,
-      EventCreatorArtifact.abi,
-      this._provider.getSigner(0)
-    );
-  }
+          const totalMinted = totalMintedBN.toNumber();
+          const myTickets = [];
+          const myTicketsID = [];
+          let myTicketsNum = 0;
 
-  _startPollingData() {
-    this._pollDataInterval = setInterval(() => this._updateBalance(), 1000);
-    this._updateBalance();
-    this._getEventsData();
-  }
+          if (currentUser) {
+            const balanceBN = await thisEvent.balanceOf(addr);
+            myTicketsNum = balanceBN.toNumber();
 
-  _stopPollingData() {
-    clearInterval(this._pollDataInterval);
-    this._pollDataInterval = undefined;
-  }
-
-  async _updateBalance() {
-    if (!this._provider || !this.state.selectedAddress) return;
-    const balance = ethers.utils.formatEther(
-      (await this._provider.getBalance(this.state.selectedAddress)).toString()
-    );
-    this.setState({ balance });
-  }
-
-  _dismissTransactionError() {
-    this.setState({ transactionError: undefined });
-  }
-
-  _dismissNetworkError() {
-    this.setState({ networkError: undefined });
-  }
-
-  _getRpcErrorMessage(error) {
-    if (error && error.reason) {
-      return String(error.reason);
-    }
-    if (error && error.data && error.data.message) {
-      return String(error.data.message);
-    }
-    if (error && error.message) {
-      return String(error.message);
-    }
-    return "Unknown error";
-  }
-
-  _resetState() {
-    this.setState(this.initialState);
-  }
-
-  async _switchChain() {
-    const chainIdHex = `0x${parseInt(HARDHAT_NETWORK_ID, 10).toString(16)}`;
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: chainIdHex }],
-    });
-  }
-
-  async _checkNetwork() {
-    if (window.ethereum.networkVersion !== HARDHAT_NETWORK_ID) {
-      await this._switchChain();
-    }
-  }
-
-  async _getEventsData() {
-    if (!this._eventCreator || !this._provider || !this.state.selectedAddress) {
-      return;
-    }
-
-    const selectedAddress = this.state.selectedAddress;
-    const eventCreator = this._eventCreator;
-    const eventAddresses = await eventCreator.getEvents();
-    const signer = this._provider.getSigner(0);
-    const currentUser = selectedAddress.toLowerCase();
-    const eventsData = [];
-
-    for (let i = 0; i < eventAddresses.length; i++) {
-      const eventAddr = eventAddresses[i];
-      const thisEvent = new ethers.Contract(eventAddr, EventArtifact.abi, signer);
-
-      const [
-        owner,
-        name,
-        symbol,
-        numTicketsBN,
-        numTicketsLeftBN,
-        totalMintedBN,
-        price,
-        stage,
-        myTicketsBN,
-        revenue,
-      ] = await Promise.all([
-        thisEvent.owner(),
-        thisEvent.name(),
-        thisEvent.symbol(),
-        thisEvent.numTickets(),
-        thisEvent.numTicketsLeft(),
-        thisEvent.totalMinted(),
-        thisEvent.price(),
-        thisEvent.stage(),
-        thisEvent.balanceOf(selectedAddress),
-        this._provider.getBalance(eventAddr),
-      ]);
-
-      const totalMinted = totalMintedBN.toNumber();
-      const myTickets = [];
-      const myTicketsID = [];
-
-      for (let j = 0; j < totalMinted; j++) {
-        try {
-          const ticketOwner = await thisEvent.ownerOf(j);
-          if (ticketOwner.toLowerCase() === currentUser) {
-            const used = await thisEvent.isUsed(j);
-            myTickets.push({ ticketID: j, isUsed: used });
-            myTicketsID.push(j);
+            for (let j = 0; j < totalMinted; j++) {
+              try {
+                const ticketOwner = await thisEvent.ownerOf(j);
+                if (ticketOwner.toLowerCase() === currentUser) {
+                  const used = await thisEvent.isUsed(j);
+                  myTickets.push({ ticketID: j, isUsed: used });
+                  myTicketsID.push(j);
+                }
+              } catch {
+                // Skip non-existent token IDs
+              }
+            }
           }
-        } catch (err) {
-          // Skip invalid or non-existent token IDs
+
+          eventsData.push({
+            contract: thisEvent,
+            contractAddress: eventAddr,
+            owner,
+            name,
+            symbol,
+            numTickets: numTicketsBN.toNumber(),
+            numTicketsLeft: numTicketsLeftBN.toNumber(),
+            totalMinted,
+            price,
+            priceEth: ethers.utils.formatEther(price),
+            stage: Number(stage),
+            revenue,
+            revenueEth: ethers.utils.formatEther(revenue),
+            myTicketsNum,
+            myTicketsID,
+            myTickets,
+          });
+        }
+
+        if (
+          requestId === eventsRequestIdRef.current &&
+          selectedAddressRef.current === addr
+        ) {
+          setEvents(eventsData);
+          setRpcConnected(true);
+          setRpcError("");
+          setEventsLoading(false);
+        }
+      } catch (err) {
+        if (requestId === eventsRequestIdRef.current) {
+          setRpcConnected(false);
+          setRpcError(
+            "Không thể kết nối Hardhat Local (http://127.0.0.1:8545). Hãy đảm bảo đã chạy `npx hardhat node` và `scripts/deploy.js`."
+          );
+          setEventsLoading(false);
         }
       }
+    },
+    []
+  );
 
-      eventsData.push({
-        contract: thisEvent,
-        contractAddress: eventAddr,
-        owner,
-        name,
-        symbol,
-        numTickets: numTicketsBN.toNumber(),
-        numTicketsLeft: numTicketsLeftBN.toNumber(),
-        totalMinted,
-        price,
-        priceEth: ethers.utils.formatEther(price),
-        stage: Number(stage),
-        revenue,
-        revenueEth: ethers.utils.formatEther(revenue),
-        myTicketsNum: myTicketsBN.toNumber(),
-        myTicketsID,
-        myTickets,
-      });
+  useEffect(() => {
+    selectedAddressRef.current = selectedAddress;
+    setEventsLoading(true);
+
+    if (!selectedAddress) {
+      const readProvider = new ethers.providers.JsonRpcProvider(LOCAL_RPC_URL);
+      const readCreator = new ethers.Contract(
+        contractAddress.EventCreator,
+        EventCreatorArtifact.abi,
+        readProvider
+      );
+
+      providerRef.current = readProvider;
+      eventCreatorRef.current = readCreator;
+      setEventCreator(readCreator);
+      setBalance(undefined);
+
+      getEventsData(undefined, readProvider, readCreator);
+
+      return () => {
+        eventsRequestIdRef.current += 1;
+      };
     }
 
-    if (this.state.selectedAddress === selectedAddress && this._eventCreator === eventCreator) {
-      this.setState({ events: eventsData });
+    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signerCreator = new ethers.Contract(
+      contractAddress.EventCreator,
+      EventCreatorArtifact.abi,
+      web3Provider.getSigner(0)
+    );
+
+    providerRef.current = web3Provider;
+    eventCreatorRef.current = signerCreator;
+    setEventCreator(signerCreator);
+
+    updateBalance(selectedAddress, web3Provider).catch(() => {});
+    getEventsData(selectedAddress, web3Provider, signerCreator);
+
+    const pollInterval = setInterval(() => {
+      updateBalance(selectedAddress, web3Provider).catch(() => {});
+    }, 1000);
+
+    return () => {
+      clearInterval(pollInterval);
+      eventsRequestIdRef.current += 1;
+    };
+  }, [selectedAddress, updateBalance, getEventsData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.ethereum) {
+      return undefined;
+    }
+
+    const handleAccountsChanged = (accounts) => {
+      const nextAddress = accounts && accounts[0];
+      if (!nextAddress) {
+        eventsRequestIdRef.current += 1;
+        selectedAddressRef.current = undefined;
+        setSelectedAddress(undefined);
+        setBalance(undefined);
+        setTxBeingSent(undefined);
+        setTransactionError(undefined);
+        setPendingPurchase(null);
+        return;
+      }
+      setSelectedAddress(nextAddress);
+    };
+
+    const handleChainChanged = () => {
+      window.location.reload();
+    };
+
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+    window.ethereum.on("chainChanged", handleChainChanged);
+
+    return () => {
+      window.ethereum.removeListener?.("accountsChanged", handleAccountsChanged);
+      window.ethereum.removeListener?.("chainChanged", handleChainChanged);
+    };
+  }, []);
+
+  async function ensureLocalNetwork() {
+    const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+    if (
+      (chainIdHex && chainIdHex.toLowerCase() !== HARDHAT_CHAIN_HEX) ||
+      (window.ethereum.networkVersion &&
+        window.ethereum.networkVersion !== HARDHAT_NETWORK_ID)
+    ) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: HARDHAT_CHAIN_HEX }],
+        });
+      } catch (switchError) {
+        if (switchError?.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: HARDHAT_CHAIN_HEX,
+                chainName: "Localhost 8545",
+                rpcUrls: [LOCAL_RPC_URL],
+                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
     }
   }
+
+  async function connectWallet() {
+    if (typeof window === "undefined" || window.ethereum === undefined) {
+      setNetworkError(
+        "Chưa phát hiện ví MetaMask trên trình duyệt. Hãy cài extension MetaMask (metamask.io/download) rồi tải lại trang."
+      );
+      return null;
+    }
+
+    try {
+      setNetworkError(undefined);
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+      const address = accounts && accounts[0];
+      if (!address) return null;
+
+      await ensureLocalNetwork();
+      setSelectedAddress(address);
+      return address;
+    } catch (error) {
+      setNetworkError(getRpcErrorMessage(error));
+      return null;
+    }
+  }
+
+  function getSignerEventContract(eventAddr) {
+    const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+    return new ethers.Contract(
+      eventAddr,
+      EventArtifact.abi,
+      web3Provider.getSigner(0)
+    );
+  }
+
+  function handleSelectPurchase(eventItem) {
+    setPendingPurchase({
+      contractAddress: eventItem.contractAddress,
+      name: eventItem.name,
+      symbol: eventItem.symbol,
+      price: eventItem.price,
+      priceEth: eventItem.priceEth,
+      numTicketsLeft: eventItem.numTicketsLeft,
+    });
+    setActiveTab(1);
+  }
+
+  const navTabs = [
+    { label: "Khám phá sự kiện" },
+    { label: "Vé của tôi", hasPending: !!pendingPurchase },
+    { label: "Soát vé (Gate)" },
+    { label: "Ban tổ chức" },
+  ];
+
+  return (
+    <Box minH="100vh" bg="#000000" color="#ffffff">
+      <Tabs
+        index={activeTab}
+        onChange={setActiveTab}
+        variant="unstyled"
+        isLazy={false}
+      >
+        {/* Sticky OpenSea Dark Navbar */}
+        <Box
+          as="header"
+          position="sticky"
+          top={0}
+          zIndex={100}
+          bg="rgba(0, 0, 0, 0.85)"
+          backdropFilter="blur(12px)"
+          borderBottom="1px solid"
+          borderColor="#202020"
+        >
+          <Container maxW="1240px" py={3.5}>
+            <Flex
+              align="center"
+              justify="space-between"
+              gap={4}
+              wrap={{ base: "wrap", lg: "nowrap" }}
+            >
+              {/* Left: Brand + Local Network status */}
+              <HStack spacing={3}>
+                <Text
+                  fontSize="xl"
+                  fontWeight="700"
+                  letterSpacing="-0.02em"
+                  color="#ffffff"
+                  cursor="pointer"
+                  onClick={() => setActiveTab(0)}
+                >
+                  NFT
+                  <Text as="span" color="#83c3ff">
+                    ix
+                  </Text>
+                </Text>
+                <HStack
+                  spacing={2}
+                  px={2.5}
+                  py={1}
+                  bg="#0c0c0c"
+                  border="1px solid"
+                  borderColor="#202020"
+                  borderRadius="9999px"
+                >
+                  <Box
+                    w="8px"
+                    h="8px"
+                    borderRadius="9999px"
+                    bg={rpcConnected ? "#10B981" : "#F43F5E"}
+                    boxShadow={
+                      rpcConnected
+                        ? "0 0 8px rgba(16, 185, 129, 0.8)"
+                        : "0 0 8px rgba(244, 63, 94, 0.8)"
+                    }
+                  />
+                  <Text fontSize="xs" fontFamily="mono" color="#acacac">
+                    Localhost:8545
+                  </Text>
+                </HStack>
+              </HStack>
+
+              {/* Center: 4 Navigation Tabs */}
+              <TabList
+                gap={1}
+                p={1}
+                bg="#0c0c0c"
+                border="1px solid"
+                borderColor="#202020"
+                borderRadius="12px"
+                order={{ base: 3, lg: 2 }}
+                w={{ base: "full", lg: "auto" }}
+                overflowX="auto"
+              >
+                {navTabs.map((item) => (
+                  <Tab
+                    key={item.label}
+                    px={3.5}
+                    py={2}
+                    fontSize="sm"
+                    fontWeight="600"
+                    color="#acacac"
+                    borderRadius="10px"
+                    whiteSpace="nowrap"
+                    transition="all 250ms cubic-bezier(0.16, 1, 0.3, 1)"
+                    _hover={{ color: "#ffffff", bg: "#141414" }}
+                    _selected={{
+                      color: "#000000",
+                      bg: "#83c3ff",
+                    }}
+                  >
+                    <HStack spacing={2}>
+                      <Text>{item.label}</Text>
+                      {item.hasPending && (
+                        <Box
+                          w="7px"
+                          h="7px"
+                          borderRadius="9999px"
+                          bg="#10B981"
+                        />
+                      )}
+                    </HStack>
+                  </Tab>
+                ))}
+              </TabList>
+
+              {/* Right: Wallet Action / Pill */}
+              <Box order={{ base: 2, lg: 3 }}>
+                {!selectedAddress ? (
+                  <Button
+                    bg="#83c3ff"
+                    color="#000000"
+                    fontWeight="700"
+                    fontSize="sm"
+                    px={5}
+                    h="40px"
+                    borderRadius="12px"
+                    transition="all 250ms cubic-bezier(0.16, 1, 0.3, 1)"
+                    _hover={{ bg: "#a2d3ff", transform: "translateY(-1px)" }}
+                    onClick={connectWallet}
+                  >
+                    Connect Wallet
+                  </Button>
+                ) : (
+                  <HStack
+                    spacing={2.5}
+                    px={3.5}
+                    h="40px"
+                    bg="#141414"
+                    border="1px solid"
+                    borderColor="#202020"
+                    borderRadius="9999px"
+                  >
+                    <Box
+                      w="8px"
+                      h="8px"
+                      borderRadius="9999px"
+                      bg="#10B981"
+                    />
+                    <Text fontFamily="mono" fontSize="xs" color="#ffffff">
+                      {shortenAddress(selectedAddress)}
+                    </Text>
+                    {balance !== undefined && (
+                      <Badge
+                        px={2}
+                        py={0.5}
+                        borderRadius="9999px"
+                        bg="#0c0c0c"
+                        border="1px solid"
+                        borderColor="#202020"
+                        color="#83c3ff"
+                        fontFamily="mono"
+                        fontSize="xs"
+                        textTransform="none"
+                      >
+                        {balance} ETH
+                      </Badge>
+                    )}
+                  </HStack>
+                )}
+              </Box>
+            </Flex>
+          </Container>
+        </Box>
+
+        {/* Main Content */}
+        <Container maxW="1240px" py={8}>
+          {networkError && (
+            <NetworkErrorMessage
+              message={networkError}
+              dismiss={dismissNetworkError}
+            />
+          )}
+          {rpcError && (
+            <NetworkErrorMessage
+              message={rpcError}
+              dismiss={() => setRpcError("")}
+            />
+          )}
+          {txBeingSent && (
+            <WaitingForTransactionMessage txHash={txBeingSent} />
+          )}
+          {transactionError && (
+            <TransactionErrorMessage
+              message={getRpcErrorMessage(transactionError)}
+              dismiss={dismissTransactionError}
+            />
+          )}
+
+          <TabPanels>
+            {/* Screen 1: Khám phá sự kiện */}
+            <BuyTickets
+              events={events}
+              eventsLoading={eventsLoading}
+              selectedAddress={selectedAddress}
+              txBeingSent={txBeingSent}
+              connectWallet={connectWallet}
+              onSelectPurchase={handleSelectPurchase}
+              onGoToOrganizer={() => setActiveTab(3)}
+            />
+
+            {/* Screen 2: Vé của tôi */}
+            <MyTickets
+              isActive={activeTab === 1}
+              events={events}
+              selectedAddress={selectedAddress}
+              pendingPurchase={pendingPurchase}
+              onClearPendingPurchase={() => setPendingPurchase(null)}
+              txBeingSent={txBeingSent}
+              setTxBeingSent={setTxBeingSent}
+              setTransactionError={setTransactionError}
+              dismissTransactionError={dismissTransactionError}
+              updateBalance={updateBalance}
+              getEventsData={getEventsData}
+              getSignerEventContract={getSignerEventContract}
+              connectWallet={connectWallet}
+              onTxSuccess={setTxSuccess}
+            />
+
+            {/* Screen 3: Soát vé (Gate) */}
+            <EntryGate
+              isActive={activeTab === 2}
+              events={events}
+              selectedAddress={selectedAddress}
+              txBeingSent={txBeingSent}
+              setTxBeingSent={setTxBeingSent}
+              dismissTransactionError={dismissTransactionError}
+              updateBalance={updateBalance}
+              getEventsData={getEventsData}
+              connectWallet={connectWallet}
+            />
+
+            {/* Screen 4: Ban tổ chức */}
+            <TabPanel p={0}>
+              {!selectedAddress ? (
+                <Box
+                  maxW="520px"
+                  mx="auto"
+                  mt={8}
+                  p={8}
+                  bg="#0c0c0c"
+                  border="1px solid"
+                  borderColor="#202020"
+                  borderRadius="16px"
+                  textAlign="center"
+                >
+                  <Text fontSize="xl" fontWeight="700" mb={2}>
+                    Khu vực Ban tổ chức
+                  </Text>
+                  <Text fontSize="sm" color="#acacac" mb={6}>
+                    Kết nối ví MetaMask của bạn để tạo sự kiện mới, mở bán vé,
+                    cấp quyền nhân viên soát vé và rút doanh thu.
+                  </Text>
+                  <Button
+                    bg="#83c3ff"
+                    color="#000000"
+                    fontWeight="700"
+                    borderRadius="12px"
+                    px={6}
+                    _hover={{ bg: "#a2d3ff" }}
+                    onClick={connectWallet}
+                  >
+                    Connect Wallet
+                  </Button>
+                </Box>
+              ) : (
+                <Box>
+                  <CreateEvent
+                    eventCreator={eventCreator}
+                    txBeingSent={txBeingSent}
+                    setTxBeingSent={setTxBeingSent}
+                    setTransactionError={setTransactionError}
+                    dismissTransactionError={dismissTransactionError}
+                    updateBalance={updateBalance}
+                    getEventsData={getEventsData}
+                    onTxSuccess={setTxSuccess}
+                  />
+                  <Box mt={10}>
+                    <MyEvents
+                      events={events}
+                      selectedAddress={selectedAddress}
+                      txBeingSent={txBeingSent}
+                      setTxBeingSent={setTxBeingSent}
+                      setTransactionError={setTransactionError}
+                      dismissTransactionError={dismissTransactionError}
+                      updateBalance={updateBalance}
+                      getEventsData={getEventsData}
+                      onTxSuccess={setTxSuccess}
+                    />
+                  </Box>
+                </Box>
+              )}
+            </TabPanel>
+          </TabPanels>
+        </Container>
+      </Tabs>
+
+      <TxSuccessModal
+        isOpen={!!txSuccess}
+        onClose={() => setTxSuccess(null)}
+        title={txSuccess?.title}
+        message={txSuccess?.message}
+        eventName={txSuccess?.eventName}
+        tokenId={txSuccess?.tokenId}
+        txHash={txSuccess?.txHash}
+      />
+    </Box>
+  );
 }

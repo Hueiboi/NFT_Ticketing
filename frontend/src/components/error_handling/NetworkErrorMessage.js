@@ -1,18 +1,30 @@
 import React from "react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 
 export function NetworkErrorMessage({ message, dismiss }) {
   return (
-    <div className="alert alert-danger" role="alert">
-      {message}
-      <button
-        type="button"
-        className="close"
-        data-dismiss="alert"
-        aria-label="Close"
-        onClick={dismiss}
-      >
-        <span aria-hidden="true">&times;</span>
-      </button>
-    </div>
+    <Box
+      p={4}
+      mb={4}
+      bg="#0c0c0c"
+      border="1px solid"
+      borderColor="#F43F5E"
+      borderRadius="12px"
+    >
+      <HStack justify="space-between" align="center" spacing={4}>
+        <Text fontSize="sm" color="#F43F5E">
+          {message}
+        </Text>
+        <Button
+          size="xs"
+          variant="ghost"
+          color="#acacac"
+          _hover={{ color: "#ffffff", bg: "#141414" }}
+          onClick={dismiss}
+        >
+          ✕
+        </Button>
+      </HStack>
+    </Box>
   );
 }

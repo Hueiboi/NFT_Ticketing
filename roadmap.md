@@ -98,7 +98,68 @@ Cả bên tạo QR (`MyTickets`) và bên quét QR (`EntryGate`) **bắt buộc*
 
 ---
 
-## 4. Checklist Chạy & Kiểm thử Local
+## 4. Chi tiết Hành vi theo từng Màn hình (Screen-by-Screen Behavior Flow)
+
+### Màn hình 0: Trạng thái khởi động & Navbar (Global)
+- **Mặc định khi vào trang:** Mở thẳng **Tab 1 (`Khám phá sự kiện`)**, dùng `JsonRpcProvider("http://127.0.0.1:8545")` để đọc dữ liệu nên **không chặn** người dùng bằng màn hình Connect Wallet.
+- **Nút `Connect Wallet` (góc phải Navbar):**
+  - *Chưa nối ví:* Bấm vào sẽ yêu cầu MetaMask kết nối và tự động chuyển sang mạng `Hardhat Local` (`0x7a69` / `31337`).
+  - *Đã nối ví:* Hiển thị badge địa chỉ rút gọn (`0x123...abc`) + số dư `ETH`. Nếu user đổi tài khoản trên MetaMask (`accountsChanged`), giao diện tự động cập nhật lại danh sách vé và quyền hạn ngay lập tức.
+
+---
+
+### Màn hình 1: Khám phá sự kiện (`BuyTickets` — Tab mặc định)
+- **Hiển thị:** Lưới các Event Card (phong cách OpenSea Dark) lọc các sự kiện đang mở bán (`stage == Active`), hiển thị Tên sự kiện, Ký hiệu, Giá (`ETH`) và Số vé còn lại (`numTicketsLeft`).
+- **Hành vi Hover & Click (Behavior Bước 1):**
+  1. User di chuột (hover) vào một Event Card $\rightarrow$ Card nổi nhẹ lên, viền sáng `#83c3ff`, thanh nút hành động trượt từ đáy card lên.
+  2. User bấm vào nút hành động trên Card:
+     - *Trường hợp A (Chưa nối ví):* Bật pop-up MetaMask yêu cầu kết nối ví. Sau khi nối ví thành công, hệ thống tự động lưu sự kiện đó vào biến tạm `pendingPurchase` và chuyển sang **Tab 2 (`Vé của tôi`)**.
+     - *Trường hợp B (Đã nối ví):* Lưu ngay sự kiện vào `pendingPurchase` và tự động chuyển sang **Tab 2 (`Vé của tôi`)**.
+
+---
+
+### Màn hình 2: Vé của tôi (`MyTickets`)
+Chia làm 2 khu vực rõ ràng từ trên xuống dưới:
+
+- **Khu vực A — Vé chờ thanh toán (Behavior Bước 2):**
+  - Chỉ hiển thị khi có dữ liệu trong `pendingPurchase`.
+  - Hiện thẻ tóm tắt sự kiện vừa chọn kèm nút **`Confirm thanh toán`**.
+  - *Hành vi:* Bấm `Confirm thanh toán` $\rightarrow$ Gọi `eventContract.buyTicket({ value: price })` $\rightarrow$ MetaMask bật xác nhận $\rightarrow$ Chờ `tx.wait()` $\rightarrow$ Xóa `pendingPurchase`, bật **Pop-up Thành công (`TxHash`)** (Bước 5), và tự động tải lại danh sách vé bên dưới.
+
+- **Khu vực B — Danh sách Vé NFT đã sở hữu (Behavior Bước 3):**
+  - Quét các `tokenId` có `ownerOf(tokenId) == selectedAddress`, hiển thị dạng **Ticket Stub** kèm badge trạng thái đọc từ `isUsed(tokenId)`:
+    - `Valid` (Màu xanh `#10B981`): Hiển thị nút **`Lấy mã QR`**.
+    - `Used` (Màu đỏ `#F43F5E`): Nút bị vô hiệu hóa (`Đã sử dụng`).
+  - *Hành vi khi bấm `Lấy mã QR`:*
+    1. Gọi `signer.signMessage("${contractAddress}:${tokenId}:${timestamp}")` để lấy chữ ký số Off-chain.
+    2. Mở **Modal Dynamic QR** (mã QR nằm trên nền vuông trắng `#FFFFFF` `padding: 16px`), bắt đầu thanh đếm ngược **30 giây**.
+    3. Kèm 2 nút tiện ích: **`Làm mới mã QR`** (ký lại timestamp mới khi hết 30s) và **`Copy chuỗi QR`** (copy chuỗi JSON `{ contractAddress, tokenId, timestamp, signature }` để test nhanh).
+
+---
+
+### Màn hình 3: Soát vé (`EntryGate` — Behavior Bước 4 & 5)
+- **Đối tượng dùng:** Ví Ban tổ chức (`owner`) hoặc Nhân viên soát vé (`staff`).
+- **Hiển thị:** Khung quét Camera (`html5-qrcode` có đường laser xanh chạy dọc) + Ô input **`Dán chuỗi QR dự phòng`** ngay bên dưới.
+- **Hành vi khi quét được mã QR (hoặc bấm Xác nhận chuỗi QR):**
+  1. **Kiểm tra Off-chain (Chống chụp màn hình/Replay):** Parse JSON QR, kiểm tra `Date.now() - timestamp <= 35000` (còn hạn 30s). Nếu quá hạn $\rightarrow$ Báo lỗi đỏ *"Mã QR đã hết hạn, vui lòng làm mới"*.
+  2. **Xác thực chữ ký số:** Dùng `ethers.utils.verifyMessage(...)` khôi phục địa chỉ người ký (`recoveredAddress`).
+  3. **Đối chiếu On-chain:** Gọi `eventContract.ownerOf(tokenId)` và `eventContract.isUsed(tokenId)`:
+     - Nếu `recoveredAddress !== owner` $\rightarrow$ Báo lỗi *"Chữ ký không khớp chủ sở hữu vé"*.
+     - Nếu `isUsed == true` $\rightarrow$ Báo lỗi *"Cảnh báo: Vé này đã được sử dụng trước đó!"*.
+  4. **Ghi nhận lên Blockchain:** Nếu hợp lệ toàn bộ $\rightarrow$ Gọi `eventContract.useTicket(tokenId)` $\rightarrow$ Chờ `tx.wait()` $\rightarrow$ Bật **Pop-up Thành công kèm `TxHash`** (Bước 5).
+
+---
+
+### Màn hình 4: Ban tổ chức (`MyEvents` / `CreateEvent`)
+- **Tạo sự kiện mới:** Form 4 trường (`Tên sự kiện`, `Ký hiệu`, `Số lượng vé`, `Giá vé ETH`) gọi `eventCreator.createEvent(...)`.
+- **Quản lý sự kiện đã tạo:** Liệt kê các sự kiện do ví hiện tại làm `owner`, cung cấp 3 thao tác quản trị:
+  1. **Chuyển giai đoạn (Stage):** Nút chuyển tuần tự `Prep` $\rightarrow$ `Active` (Mở bán) $\rightarrow$ `CheckinOpen` (Mở cổng soát vé) $\rightarrow$ `Closed`.
+  2. **Cấp quyền nhân viên:** Nhập địa chỉ ví nhân viên và gọi `setStaff(address, true)`.
+  3. **Rút doanh thu:** Hiển thị số dư ETH đang khóa trong contract sự kiện và nút **`Rút doanh thu`** gọi `withdrawRevenue()`.
+
+---
+
+## 5. Checklist Chạy & Kiểm thử Local
 
 1. Terminal 1 — Chạy node Blockchain local:
    ```bash

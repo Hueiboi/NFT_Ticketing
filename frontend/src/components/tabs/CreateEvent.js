@@ -1,118 +1,205 @@
-import React from "react";
+import React, { useState } from "react";
 import { ethers } from "ethers";
-import { Heading, Button, Input, Stack, TabPanel } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Heading,
+  Input,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 
 const ERROR_CODE_TX_REJECTED_BY_USER = 4001;
 
-export class CreateEvent extends React.Component {
-  async createEvent(numTickets, priceEth, name, symbol) {
+export function CreateEvent({
+  eventCreator,
+  txBeingSent,
+  setTxBeingSent,
+  setTransactionError,
+  dismissTransactionError,
+  updateBalance,
+  getEventsData,
+  onTxSuccess,
+}) {
+  const [eventName, setEventName] = useState("");
+  const [eventSymbol, setEventSymbol] = useState("");
+  const [numTickets, setNumTickets] = useState("");
+  const [price, setPrice] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!eventCreator || txBeingSent) return;
+
     try {
-      this.props.dismissTransactionError();
-      const priceWei = ethers.utils.parseEther(String(priceEth || "0"));
-      const tx = await this.props.eventCreator.createEvent(
+      dismissTransactionError();
+      const createdName = eventName;
+      const priceWei = ethers.utils.parseEther(String(price || "0"));
+      const tx = await eventCreator.createEvent(
         parseInt(numTickets, 10),
         priceWei,
-        name,
-        symbol
+        createdName,
+        eventSymbol
       );
-      this.props.setState({ txBeingSent: tx.hash });
+      setTxBeingSent(tx.hash);
       const receipt = await tx.wait();
 
       if (receipt.status === 0) {
-        throw new Error("Transaction failed");
+        throw new Error("Tạo sự kiện thất bại.");
       }
 
-      await this.props.updateBalance();
-      await this.props.getEventsData();
+      setEventName("");
+      setEventSymbol("");
+      setNumTickets("");
+      setPrice("");
+
+      await Promise.allSettled([updateBalance(), getEventsData()]);
+
+      onTxSuccess?.({
+        title: "Tạo sự kiện thành công",
+        message: "Hợp đồng Event ERC-721 đã được deploy lên Blockchain.",
+        eventName: createdName,
+        txHash: tx.hash,
+      });
     } catch (error) {
-      if (error.code === ERROR_CODE_TX_REJECTED_BY_USER) {
+      if (error?.code === ERROR_CODE_TX_REJECTED_BY_USER) {
         return;
       }
-      this.props.setState({ transactionError: error });
+      setTransactionError(error);
     } finally {
-      this.props.setState({ txBeingSent: undefined });
+      setTxBeingSent(undefined);
     }
   }
 
-  render() {
-    return (
-      <TabPanel mt="15px" mb="15px" align="center">
-        <Stack width="600px" align="center" justify="center">
-          <Heading mb="25px">Create an Event</Heading>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              this.createEvent(
-                this.props.state.formNumTickets,
-                this.props.state.formPrice,
-                this.props.state.formEventName,
-                this.props.state.formEventSymbol
-              );
-            }}
+  return (
+    <Box
+      p={6}
+      bg="#0c0c0c"
+      border="1px solid"
+      borderColor="#202020"
+      borderRadius="16px"
+    >
+      <Box mb={6}>
+        <Heading fontSize="xl" fontWeight="700" color="#ffffff">
+          Tạo sự kiện mới
+        </Heading>
+        <Text fontSize="sm" color="#acacac" mt={1}>
+          Deploy một Smart Contract vé ERC-721 mới thông qua EventCreator Factory.
+        </Text>
+      </Box>
+
+      <Box as="form" onSubmit={handleSubmit}>
+        <VStack spacing={4} align="stretch">
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+            <FormControl isRequired>
+              <FormLabel htmlFor="create-name" fontSize="sm" color="#acacac">
+                Tên sự kiện
+              </FormLabel>
+              <Input
+                id="create-name"
+                type="text"
+                placeholder="Ví dụ: NFTix Music Fest"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                bg="#141414"
+                border="1px solid"
+                borderColor="#202020"
+                borderRadius="12px"
+                h="44px"
+                color="#ffffff"
+                _placeholder={{ color: "#64748B" }}
+                _focus={{ borderColor: "#83c3ff", boxShadow: "none" }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel htmlFor="create-symbol" fontSize="sm" color="#acacac">
+                Ký hiệu Token (Symbol)
+              </FormLabel>
+              <Input
+                id="create-symbol"
+                type="text"
+                placeholder="Ví dụ: NMF"
+                value={eventSymbol}
+                onChange={(e) => setEventSymbol(e.target.value)}
+                bg="#141414"
+                border="1px solid"
+                borderColor="#202020"
+                borderRadius="12px"
+                h="44px"
+                color="#ffffff"
+                fontFamily="mono"
+                _placeholder={{ color: "#64748B" }}
+                _focus={{ borderColor: "#83c3ff", boxShadow: "none" }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel htmlFor="create-num-tickets" fontSize="sm" color="#acacac">
+                Số lượng vé phát hành
+              </FormLabel>
+              <Input
+                id="create-num-tickets"
+                type="number"
+                min="1"
+                placeholder="Ví dụ: 50"
+                value={numTickets}
+                onChange={(e) => setNumTickets(e.target.value)}
+                bg="#141414"
+                border="1px solid"
+                borderColor="#202020"
+                borderRadius="12px"
+                h="44px"
+                color="#ffffff"
+                fontFamily="mono"
+                _placeholder={{ color: "#64748B" }}
+                _focus={{ borderColor: "#83c3ff", boxShadow: "none" }}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel htmlFor="create-price" fontSize="sm" color="#acacac">
+                Giá vé (ETH)
+              </FormLabel>
+              <Input
+                id="create-price"
+                type="number"
+                step="any"
+                min="0"
+                placeholder="Ví dụ: 0.05"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                bg="#141414"
+                border="1px solid"
+                borderColor="#202020"
+                borderRadius="12px"
+                h="44px"
+                color="#ffffff"
+                fontFamily="mono"
+                _placeholder={{ color: "#64748B" }}
+                _focus={{ borderColor: "#83c3ff", boxShadow: "none" }}
+              />
+            </FormControl>
+          </SimpleGrid>
+
+          <Button
+            type="submit"
+            alignSelf={{ base: "stretch", md: "flex-start" }}
+            px={8}
+            h="44px"
+            bg="#83c3ff"
+            color="#000000"
+            fontWeight="700"
+            borderRadius="12px"
+            isDisabled={!!txBeingSent}
+            _hover={{ bg: "#a2d3ff" }}
           >
-            <Input
-              isRequired
-              id="name"
-              type="text"
-              size="md"
-              placeholder="Event name"
-              value={this.props.state.formEventName}
-              onChange={(e) => this.props.setState({ formEventName: e.target.value })}
-              mb="10px"
-              _placeholder={{ color: "gray.500" }}
-              w="450px"
-            />
-            <Input
-              isRequired
-              id="symbol"
-              type="text"
-              size="md"
-              placeholder="Token symbol"
-              value={this.props.state.formEventSymbol}
-              onChange={(e) => this.props.setState({ formEventSymbol: e.target.value })}
-              mb="10px"
-              _placeholder={{ color: "gray.500" }}
-              w="450px"
-            />
-            <Input
-              isRequired
-              id="numTickets"
-              type="number"
-              min="1"
-              size="md"
-              placeholder="Number of Tickets"
-              value={this.props.state.formNumTickets}
-              onChange={(e) => this.props.setState({ formNumTickets: e.target.value })}
-              mb="10px"
-              _placeholder={{ color: "gray.500" }}
-              w="450px"
-            />
-            <Input
-              isRequired
-              id="price"
-              type="number"
-              step="any"
-              min="0"
-              size="md"
-              placeholder="Price (ETH)"
-              value={this.props.state.formPrice}
-              onChange={(e) => this.props.setState({ formPrice: e.target.value })}
-              mb="10px"
-              _placeholder={{ color: "gray.500" }}
-              w="450px"
-            />
-            <Button
-              type="submit"
-              color={this.props.state.darkGreen}
-              backgroundColor={this.props.state.lightGreen}
-              size="lg"
-              mt="10px"
-            >
-              CREATE EVENT
-            </Button>
-          </form>
-        </Stack>
-      </TabPanel>
-    );
-  }
+            Tạo sự kiện
+          </Button>
+        </VStack>
+      </Box>
+    </Box>
+  );
 }
